@@ -1,20 +1,36 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Users, PieChart, Filter, Search, PlusCircle } from 'lucide-react';
+import { Users, PieChart, Filter, Search, PlusCircle, Clock, Wallet } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { Card, CardBody, CardHeader } from '../../components/ui/Card';
 import { Input } from '../../components/ui/Input';
 import { Badge } from '../../components/ui/Badge';
 import { EntrepreneurCard } from '../../components/entrepreneur/EntrepreneurCard';
 import { useAuth } from '../../context/AuthContext';
-import { Entrepreneur } from '../../types';
-import { entrepreneurs } from '../../data/users';
+import { Entrepreneur, Meeting } from '../../types';
+import { entrepreneurs, findUserById } from '../../data/users';
 import { getRequestsFromInvestor } from '../../data/collaborationRequests';
+import { getUpcomingMeetings } from '../../data/meetings';
+import { getWallet } from '../../data/payments';
+import { format } from 'date-fns';
 
 export const InvestorDashboard: React.FC = () => {
   const { user } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedIndustries, setSelectedIndustries] = useState<string[]>([]);
+  const [upcomingMeetings, setUpcomingMeetings] = useState<Meeting[]>([]);
+  const [walletBalance, setWalletBalance] = useState<number>(0);
+  
+  useEffect(() => {
+    if (user) {
+      const meetings = getUpcomingMeetings(user.id);
+      setUpcomingMeetings(meetings);
+      
+      // Load wallet balance
+      const wallet = getWallet(user.id);
+      setWalletBalance(wallet?.balance || 0);
+    }
+  }, [user]);
   
   if (!user) return null;
   
@@ -101,7 +117,26 @@ export const InvestorDashboard: React.FC = () => {
       </div>
       
       {/* Stats summary */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <Card className="bg-gradient-to-br from-primary-600 to-primary-800 text-white">
+          <CardBody>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-primary-100 text-sm font-medium mb-1">Wallet Balance</p>
+                <h3 className="text-2xl font-bold">
+                  ${(walletBalance / 1000000).toFixed(1)}M
+                </h3>
+              </div>
+              <div className="p-3 bg-white bg-opacity-20 rounded-full">
+                <Wallet size={24} className="text-white" />
+              </div>
+            </div>
+            <Link to="/payments" className="text-primary-100 text-xs hover:text-white mt-2 inline-block">
+              View Details →
+            </Link>
+          </CardBody>
+        </Card>
+        
         <Card className="bg-primary-50 border border-primary-100">
           <CardBody>
             <div className="flex items-center">
@@ -147,40 +182,98 @@ export const InvestorDashboard: React.FC = () => {
         </Card>
       </div>
       
-      {/* Entrepreneurs grid */}
-      <div>
-        <Card>
-          <CardHeader>
-            <h2 className="text-lg font-medium text-gray-900">Featured Startups</h2>
-          </CardHeader>
-          
-          <CardBody>
-            {filteredEntrepreneurs.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {filteredEntrepreneurs.map(entrepreneur => (
-                  <EntrepreneurCard
-                    key={entrepreneur.id}
-                    entrepreneur={entrepreneur}
-                  />
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-8">
-                <p className="text-gray-600">No startups match your filters</p>
-                <Button 
-                  variant="outline" 
-                  className="mt-2"
-                  onClick={() => {
-                    setSearchQuery('');
-                    setSelectedIndustries([]);
-                  }}
-                >
-                  Clear filters
-                </Button>
-              </div>
-            )}
-          </CardBody>
-        </Card>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Entrepreneurs grid */}
+        <div className="lg:col-span-2">
+          <Card>
+            <CardHeader>
+              <h2 className="text-lg font-medium text-gray-900">Featured Startups</h2>
+            </CardHeader>
+            
+            <CardBody>
+              {filteredEntrepreneurs.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {filteredEntrepreneurs.map(entrepreneur => (
+                    <EntrepreneurCard
+                      key={entrepreneur.id}
+                      entrepreneur={entrepreneur}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <p className="text-gray-600">No startups match your filters</p>
+                  <Button 
+                    variant="outline" 
+                    className="mt-2"
+                    onClick={() => {
+                      setSearchQuery('');
+                      setSelectedIndustries([]);
+                    }}
+                  >
+                    Clear filters
+                  </Button>
+                </div>
+              )}
+            </CardBody>
+          </Card>
+        </div>
+
+        {/* Upcoming Meetings Sidebar */}
+        {upcomingMeetings.length > 0 && (
+          <div className="space-y-4">
+            <Card>
+              <CardHeader className="flex justify-between items-center">
+                <h2 className="text-lg font-medium text-gray-900">Upcoming Meetings</h2>
+                <Link to="/calendar" className="text-sm font-medium text-primary-600 hover:text-primary-500">
+                  View calendar
+                </Link>
+              </CardHeader>
+              
+              <CardBody>
+                <div className="space-y-3">
+                  {upcomingMeetings.slice(0, 5).map(meeting => {
+                    const otherParticipants = meeting.participantIds
+                      .filter(id => id !== user.id)
+                      .map(id => findUserById(id))
+                      .filter(Boolean);
+                    
+                    return (
+                      <div key={meeting.id} className="p-4 bg-primary-50 rounded-lg border border-primary-200">
+                        <div className="flex items-start justify-between mb-2">
+                          <div className="flex-1">
+                            <p className="font-medium text-gray-900">{meeting.title}</p>
+                            <p className="text-sm text-gray-600 mt-1">
+                              with {otherParticipants.map(p => p?.name).join(', ')}
+                            </p>
+                          </div>
+                          <Badge variant="primary">Scheduled</Badge>
+                        </div>
+                        {meeting.description && (
+                          <p className="text-sm text-gray-600 mb-2">{meeting.description}</p>
+                        )}
+                        <div className="flex items-center text-sm text-gray-500">
+                          <Clock size={14} className="mr-1" />
+                          {format(new Date(meeting.startTime), 'MMM d, yyyy')} at {format(new Date(meeting.startTime), 'h:mm a')} - {format(new Date(meeting.endTime), 'h:mm a')}
+                        </div>
+                        {meeting.meetingLink && (
+                          <a
+                            href={meeting.meetingLink}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-sm text-primary-600 hover:text-primary-700 mt-2 inline-block"
+                          >
+                            Join Meeting →
+                          </a>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </CardBody>
+            </Card>
+          </div>
+        )}
       </div>
     </div>
   );

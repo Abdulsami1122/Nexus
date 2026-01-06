@@ -1,5 +1,6 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { Toaster } from 'react-hot-toast';
 import { AuthProvider } from './context/AuthContext';
 
 // Layouts
@@ -30,9 +31,44 @@ import { DealsPage } from './pages/deals/DealsPage';
 // Chat Pages
 import { ChatPage } from './pages/chat/ChatPage';
 
+// Calendar Pages
+import { CalendarPage } from './pages/calendar/CalendarPage';
+
+// Video Call Pages
+import { VideoCallPage } from './pages/video/VideoCallPage';
+
+// Document Chamber Pages
+import { DocumentChamberPage } from './pages/documents/DocumentChamberPage';
+
+// Payment Pages
+import { PaymentPage } from './pages/payments/PaymentPage';
+
 function App() {
   return (
     <AuthProvider>
+      <Toaster 
+        position="top-right"
+        toastOptions={{
+          duration: 3000,
+          style: {
+            background: '#fff',
+            color: '#374151',
+            boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
+          },
+          success: {
+            iconTheme: {
+              primary: '#22C55E',
+              secondary: '#fff',
+            },
+          },
+          error: {
+            iconTheme: {
+              primary: '#EF4444',
+              secondary: '#fff',
+            },
+          },
+        }}
+      />
       <Router>
         <Routes>
           {/* Authentication Routes */}
@@ -88,6 +124,26 @@ function App() {
           <Route path="/chat" element={<DashboardLayout />}>
             <Route index element={<ChatPage />} />
             <Route path=":userId" element={<ChatPage />} />
+          </Route>
+          
+          {/* Calendar Routes */}
+          <Route path="/calendar" element={<DashboardLayout />}>
+            <Route index element={<CalendarPage />} />
+          </Route>
+          
+          {/* Video Call Routes */}
+          <Route path="/video" element={<DashboardLayout />}>
+            <Route index element={<VideoCallPage />} />
+          </Route>
+          
+          {/* Document Chamber Routes */}
+          <Route path="/document-chamber" element={<DashboardLayout />}>
+            <Route index element={<DocumentChamberPage />} />
+          </Route>
+          
+          {/* Payment Routes */}
+          <Route path="/payments" element={<DashboardLayout />}>
+            <Route index element={<PaymentPage />} />
           </Route>
           
           {/* Redirect root to login */}

@@ -1,26 +1,39 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Users, Bell, Calendar, TrendingUp, AlertCircle, PlusCircle } from 'lucide-react';
+import { Users, Bell, Calendar, TrendingUp, AlertCircle, PlusCircle, Clock, Wallet } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { Card, CardBody, CardHeader } from '../../components/ui/Card';
 import { Badge } from '../../components/ui/Badge';
 import { CollaborationRequestCard } from '../../components/collaboration/CollaborationRequestCard';
 import { InvestorCard } from '../../components/investor/InvestorCard';
 import { useAuth } from '../../context/AuthContext';
-import { CollaborationRequest } from '../../types';
+import { CollaborationRequest, Meeting } from '../../types';
 import { getRequestsForEntrepreneur } from '../../data/collaborationRequests';
-import { investors } from '../../data/users';
+import { investors, findUserById } from '../../data/users';
+import { getUpcomingMeetings } from '../../data/meetings';
+import { getWallet } from '../../data/payments';
+import { format } from 'date-fns';
 
 export const EntrepreneurDashboard: React.FC = () => {
   const { user } = useAuth();
   const [collaborationRequests, setCollaborationRequests] = useState<CollaborationRequest[]>([]);
   const [recommendedInvestors, setRecommendedInvestors] = useState(investors.slice(0, 3));
+  const [upcomingMeetings, setUpcomingMeetings] = useState<Meeting[]>([]);
+  const [walletBalance, setWalletBalance] = useState<number>(0);
   
   useEffect(() => {
     if (user) {
       // Load collaboration requests
       const requests = getRequestsForEntrepreneur(user.id);
       setCollaborationRequests(requests);
+      
+      // Load upcoming meetings
+      const meetings = getUpcomingMeetings(user.id);
+      setUpcomingMeetings(meetings);
+      
+      // Load wallet balance
+      const wallet = getWallet(user.id);
+      setWalletBalance(wallet?.balance || 0);
     }
   }, [user]);
   
@@ -55,6 +68,25 @@ export const EntrepreneurDashboard: React.FC = () => {
       
       {/* Summary cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <Card className="bg-gradient-to-br from-primary-600 to-primary-800 text-white">
+          <CardBody>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-primary-100 text-sm font-medium mb-1">Wallet Balance</p>
+                <h3 className="text-2xl font-bold">
+                  ${(walletBalance / 1000).toFixed(0)}K
+                </h3>
+              </div>
+              <div className="p-3 bg-white bg-opacity-20 rounded-full">
+                <Wallet size={24} className="text-white" />
+              </div>
+            </div>
+            <Link to="/payments" className="text-primary-100 text-xs hover:text-white mt-2 inline-block">
+              View Details →
+            </Link>
+          </CardBody>
+        </Card>
+        
         <Card className="bg-primary-50 border border-primary-100">
           <CardBody>
             <div className="flex items-center">
@@ -93,21 +125,7 @@ export const EntrepreneurDashboard: React.FC = () => {
               </div>
               <div>
                 <p className="text-sm font-medium text-accent-700">Upcoming Meetings</p>
-                <h3 className="text-xl font-semibold text-accent-900">2</h3>
-              </div>
-            </div>
-          </CardBody>
-        </Card>
-        
-        <Card className="bg-success-50 border border-success-100">
-          <CardBody>
-            <div className="flex items-center">
-              <div className="p-3 bg-green-100 rounded-full mr-4">
-                <TrendingUp size={20} className="text-success-700" />
-              </div>
-              <div>
-                <p className="text-sm font-medium text-success-700">Profile Views</p>
-                <h3 className="text-xl font-semibold text-success-900">24</h3>
+                <h3 className="text-xl font-semibold text-accent-900">{upcomingMeetings.length}</h3>
               </div>
             </div>
           </CardBody>
@@ -145,6 +163,60 @@ export const EntrepreneurDashboard: React.FC = () => {
               )}
             </CardBody>
           </Card>
+
+          {/* Upcoming Meetings */}
+          {upcomingMeetings.length > 0 && (
+            <Card>
+              <CardHeader className="flex justify-between items-center">
+                <h2 className="text-lg font-medium text-gray-900">Upcoming Meetings</h2>
+                <Link to="/calendar" className="text-sm font-medium text-primary-600 hover:text-primary-500">
+                  View calendar
+                </Link>
+              </CardHeader>
+              
+              <CardBody>
+                <div className="space-y-3">
+                  {upcomingMeetings.slice(0, 5).map(meeting => {
+                    const otherParticipants = meeting.participantIds
+                      .filter(id => id !== user?.id)
+                      .map(id => findUserById(id))
+                      .filter(Boolean);
+                    
+                    return (
+                      <div key={meeting.id} className="p-4 bg-primary-50 rounded-lg border border-primary-200">
+                        <div className="flex items-start justify-between mb-2">
+                          <div className="flex-1">
+                            <p className="font-medium text-gray-900">{meeting.title}</p>
+                            <p className="text-sm text-gray-600 mt-1">
+                              with {otherParticipants.map(p => p?.name).join(', ')}
+                            </p>
+                          </div>
+                          <Badge variant="primary">Scheduled</Badge>
+                        </div>
+                        {meeting.description && (
+                          <p className="text-sm text-gray-600 mb-2">{meeting.description}</p>
+                        )}
+                        <div className="flex items-center text-sm text-gray-500">
+                          <Clock size={14} className="mr-1" />
+                          {format(new Date(meeting.startTime), 'MMM d, yyyy')} at {format(new Date(meeting.startTime), 'h:mm a')} - {format(new Date(meeting.endTime), 'h:mm a')}
+                        </div>
+                        {meeting.meetingLink && (
+                          <a
+                            href={meeting.meetingLink}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-sm text-primary-600 hover:text-primary-700 mt-2 inline-block"
+                          >
+                            Join Meeting →
+                          </a>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </CardBody>
+            </Card>
+          )}
         </div>
         
         {/* Recommended investors */}
